@@ -5,7 +5,7 @@ use strict;
 use POSIX qw(setlocale LC_ALL);
 
 my $NAME = 'postpals-taillog';
-my $VERSION = '0.02';
+my $VERSION = '0.03';
 
 setlocale(LC_ALL, 'C');
 
@@ -232,7 +232,7 @@ my $log_re = qr%
     [ ] (?:
       (r)emoved |
       from=<([^>]+\@[^>]+)> |
-      to=<([^>]+\@[^>]+)>, [ ] relay= [^\[,]+ \[ ((?!$opts{skiprelay})[\d.]+) \] [^\(]+ status=sent
+      to=<([^>]+\@[^>]+)>, [ ] relay= [^\[,]+ \[ ((?!$opts{skiprelay})[a-zA-Z0-9:.]+) \] [^\(]+ status=sent
     )
 %x;
 
