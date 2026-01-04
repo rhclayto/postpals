@@ -1,6 +1,7 @@
 Github of http://mailfud.org/postpals/
 
 Updated to add IPv6 compatibility, extra logging, & a new umask (0117) to allow writing socket file with group +rw permissions (for Postfix to access by adding Postfix to the postpals group).
+
 Also adds hardened systemd services for postpals and postpals-taillog, rather than /etc/defaults files and monit.
 
 # Postpals
@@ -21,17 +22,17 @@ Postpals is written in Perl for easy maintenance and has only few non-standard m
 Postpals-taillog is a daemon used to continuously tail postfix mail log and to send found sender/recipient/relay entries to the main postpals daemon database. That way the main daemon is more robust and not limited in which way to receive information.
 
 ## Installation on Debian / Ubuntu
-apt-get install -y libio-multiplex-perl libnet-server-perl libfile-tail-perl
-mkdir /var/postpals
-Download the code, save postpals and postpals-taillog to /usr/local/sbin/
-chmod 755 /usr/local/sbin/postpals-taillog
-chmod 755 /usr/local/sbin/postpals
-Save the contents of /etc to /etc
-Edit the /etc/systemd/system/postpals.service and /etc/systemd/system/postpals-taillog.service to set your options
-Run postpals with systemctl start postpals
-Enable postpals with systemctl enable postpals
-Run postpals-taillog with systemctl start postpals
-Enable postpals-taillog with systemctl enable postpals-taillog
+- apt-get install -y libio-multiplex-perl libnet-server-perl libfile-tail-perl
+- mkdir /var/postpals
+- Download the code, save postpals and postpals-taillog to /usr/local/sbin/
+- chmod 755 /usr/local/sbin/postpals-taillog
+- chmod 755 /usr/local/sbin/postpals
+- Save the contents of /etc to /etc
+- Edit the /etc/systemd/system/postpals.service and /etc/systemd/system/postpals-taillog.service to set your options
+- Run postpals with systemctl start postpals
+- Enable postpals with systemctl enable postpals
+- Run postpals-taillog with systemctl start postpals
+- Enable postpals-taillog with systemctl enable postpals-taillog
 
 ## Basic example
 
