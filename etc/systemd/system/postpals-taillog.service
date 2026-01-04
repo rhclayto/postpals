@@ -1,0 +1,56 @@
+[Unit]
+Description=Postpals-Taillog
+
+[Service]
+Type=simple
+User=postpals
+Group=adm
+PIDFile=/var/postpals/postpals-taillog.pid
+#ExecStart=/usr/local/sbin/postpals-taillog -f -v -p /var/postpals/postpals-taillog.pid 10040 /var/log/mail.log
+ExecStart=/usr/local/sbin/postpals-taillog -f -v -p /var/postpals/postpals-taillog.pid /var/spool/postfix/postpals/postpals.sock /var/log/mail.log
+TimeoutStartSec=420
+Restart=always
+RestartSec=10
+StandardError=journal
+StandardOutput=journal
+SyslogIdentifier=postpals-taillog
+SyslogFacility=local6
+CapabilityBoundingSet=
+AmbientCapabilities=
+IPAccounting=yes
+LockPersonality=true
+MemoryDenyWriteExecute=true
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateIPC=true
+RemoveIPC=yes
+PrivateTmp=true
+PrivateUsers=true
+PrivateMounts=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectSystem=strict
+ReadWritePaths=-/var/postpals -/var/spool/postfix/postpals
+RestrictAddressFamilies=AF_INET AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+SystemCallFilter=
+SystemCallFilter=@system-service
+SystemCallFilter=~@keyring @resources @obsolete @cpu-emulation @privileged @mount @aio @debug @memlock userfaultfd mincore
+SystemCallErrorNumber=EPERM
+UMask=0077
+#AppArmorProfile=postpals-taillog
+KeyringMode=private
+RestrictFileSystems=zfs tmpfs
+
+[Install]
+WantedBy=multi-user.target
