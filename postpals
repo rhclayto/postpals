@@ -7,12 +7,13 @@ use Time::HiRes qw(tv_interval gettimeofday);
 use Digest::MD5 qw(md5);
 use IO::Multiplex;
 use POSIX qw(setlocale LC_ALL);
+use Socket qw(inet_pton AF_INET6 AF_INET);
 
 my $NAME = 'postpals';
-my $VERSION = '0.01';
+my $VERSION = '0.02';
 
 setlocale(LC_ALL, 'C');
-umask(077);
+umask(0117);
 
 my %opts;	# global options
 my %attr;	# holds per $fh policy attributes for mux_input
@@ -75,7 +76,7 @@ sub _timetosec {
     elsif ($2 eq 'd') { return $1 * 60 * 60 * 24; }
     elsif ($2 eq 'w') { return $1 * 60 * 60 * 24 * 7; }
 }
-                           
+
 sub _log {
     my ($msg, $prio) = @_;
 
@@ -106,27 +107,35 @@ sub _digest {
 sub _add_entry {
     my ($relay, $recipient, $sender) = @_;
 
-    # no IPv6 support yet
-    $relay =~ /^(\d+\.\d+\.\d+)\.\d+$/ or $relay = '';
-    my $relay24 = defined $1 ? $1.'.0' : '';
+    my $relay24 = '';
+    my $addr_fam = AF_INET6;
+    $relay =~ /^(\d+\.\d+\.\d+)\.\d+$/;
+    if (defined $1 && $1 ne '') {
+      $relay24 = $1.'.0';
+      $addr_fam = AF_INET;
+    }
 
     # save memory
     my $n_now = pack('N', $now);
 
     if ($opts{tests}{relay} && $relay ne '') {
         # exact relay
-        my $relay_packed = inet_aton($relay);
+        _log("add relay: $relay");
+        my $relay_packed = inet_pton($addr_fam, $relay);
         $db->{relay}{$relay_packed} = $n_now;
     }
     if ($opts{tests}{relay24} && $relay24 ne '') {
         # relay/24
-        my $relay_packed = inet_aton($relay24);
+        _log("add relay24: $relay24");
+        my $relay_packed = inet_pton($addr_fam, $relay24);
         $db->{relay24}{$relay_packed} = $n_now;
     }
     if ($opts{tests}{rcpt} &&
             $sender ne '' && $recipient ne '' &&
             $sender ne $recipient) { # ignore spoofs?
         # sender/recipient pair
+        _log("add sender: $sender");
+        _log("add recipient: $recipient");
         $db->{rcpt}{_digest(lc("$sender $recipient"))} = $n_now;
     }
 }
@@ -134,21 +143,29 @@ sub _add_entry {
 sub _del_entry {
     my ($relay, $recipient, $sender) = @_;
 
-    # no IPv6 support yet
-    $relay =~ /^(\d+\.\d+\.\d+)\.\d+$/ or $relay = '';
-    my $relay24 = defined $1 ? $1.'.0' : '';
+    my $relay24 = '';
+    my $addr_fam = AF_INET6;
+    $relay =~ /^(\d+\.\d+\.\d+)\.\d+$/;
+    if (defined $1 && $1 ne '') {
+      $relay24 = $1.'.0';
+      $addr_fam = AF_INET;
+    }
 
     if ($relay ne '') {
+        _log("delete relay: $relay");
         # exact relay
-        my $relay_packed = inet_aton($relay);
+        my $relay_packed = inet_pton($addr_fam, $relay);
         delete $db->{relay}{$relay_packed};
     }
     if ($relay24 ne '') {
+        _log("delete relay24: $relay24");
         # relay/24
-        my $relay_packed = inet_aton($relay24);
+        my $relay_packed = inet_pton($addr_fam, $relay24);
         delete $db->{relay24}{$relay_packed};
     }
     if ($sender ne '' && $recipient ne '') {
+        _log("delete sender: $sender");
+        _log("delete recipient: $recipient");
         # sender/recipient pair
         delete $db->{rcpt}{_digest(lc("$sender $recipient"))};
     }
@@ -156,14 +173,22 @@ sub _del_entry {
 
 sub _check_policy {
     my ($sender, $recipient, $relay, $rname) = @_;
+    _log("sender: $sender");
+    _log("recipient: $recipient");
+    _log("relay: $relay");
+    _log("rname: $rname");
 
-    # no IPv6 support yet
-    $relay =~ /^(\d+\.\d+\.\d+)\.\d+$/ or $relay = '';
-    my $relay24 = defined $1 ? $1.'.0' : '';
+    my $relay24 = '';
+    my $addr_fam = AF_INET6;
+    $relay =~ /^(\d+\.\d+\.\d+)\.\d+$/;
+    if (defined $1 && $1 ne '') {
+      $relay24 = $1.'.0';
+      $addr_fam = AF_INET;
+    }
 
     if ($opts{tests}{relay} && $relay ne '') {
         # exact relay
-        my $relay_packed = inet_aton($relay);
+        my $relay_packed = inet_pton($addr_fam, $relay);
         if (defined $db->{relay}{$relay_packed}) {
             _log("Known relay: $rname\[$relay\] (last out ".
                  int(($now - unpack('N', $db->{relay}{$relay_packed})) / 3600).
@@ -173,7 +198,8 @@ sub _check_policy {
     }
     if ($opts{tests}{relay24} && $relay24 ne '') {
         # relay/24
-        my $relay_packed = inet_aton($relay24);
+        _log("relay/24: $relay24");
+        my $relay_packed = inet_pton($addr_fam, $relay24);
         if (defined $db->{relay24}{$relay_packed}) {
             _log("Known relay/24: $rname\[$relay\] (last out ".
                  int(($now - unpack('N', $db->{relay24}{$relay_packed})) / 3600).
@@ -228,6 +254,7 @@ sub mux_input {
                 _log('Invalid request') if $opts{verbose};
                 close($fh); last;
             } elsif ($attr{$fh}{request} eq 'smtpd_access_policy') {
+                _log('smtpd_access_policy request');
                 my $action = _check_policy(
                     $attr{$fh}{sender}         || '',
                     $attr{$fh}{recipient}      || '',
@@ -236,12 +263,14 @@ sub mux_input {
                     );
                 print $fh "action=$action\012\012";
             } elsif ($attr{$fh}{request} eq 'postpals_add_entry') {
+                _log('postpals_add_entry request');
                 _add_entry(
                     $attr{$fh}{relay}     || '',
                     $attr{$fh}{recipient} || '',
                     $attr{$fh}{sender}    || '',
                     );
             } elsif ($attr{$fh}{request} eq 'postpals_del_entry') {
+                _log('postpals_add_entry request');
                 _del_entry(
                     $attr{$fh}{relay}     || '',
                     $attr{$fh}{recipient} || '',
@@ -543,7 +572,7 @@ Postpals is free software and released under BSD license, which basically
 means that you can do what you want as long as you keep the copyright
 notice:
 
-Copyright (c) 2010, Henrik Krohns <postpals@hege.li>
+Copyright (c) 2010, Henrik Krohns <hege@hege.li>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -572,6 +601,6 @@ POSSIBILITY OF SUCH DAMAGE.
 
 =head1 AUTHOR
 
-Henrik Krohns <postpals@hege.li>
+Henrik Krohns <hege@hege.li>
 
 =cut
